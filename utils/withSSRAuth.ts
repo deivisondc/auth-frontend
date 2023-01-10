@@ -1,8 +1,9 @@
 
-// import jwtDecode from "jwt-decode"
+import jwtDecode from "jwt-decode"
 import { GetServerSideProps, GetServerSidePropsContext, GetServerSidePropsResult } from "next"
 import { destroyCookie, parseCookies } from "nookies"
 import { AuthTokenError } from "../errors/AuthTokenError"
+import { validateUserPermissions } from "./validateUserPermissions"
 
 type WithSSRAuthOptions = {
   permissions?: string[]
@@ -14,15 +15,27 @@ export function withSSRAuth<P>(fn: GetServerSideProps<P>, options?: WithSSRAuthO
     const cookies = parseCookies(ctx)
     const token = cookies['nextauth.token']
 
-    // const user = jwtDecode(token)
-
-    // console.log('user', user)
-
     if (!token) {
       return {
         redirect: {
           destination: '/',
           permanent: false
+        }
+      }
+    }
+    
+    if (options) {
+      const user = jwtDecode<{ permissions: string[], roles: string[] }>(token)
+      const { permissions, roles } = options;
+
+      const userHasValidPermissions = validateUserPermissions({ user, permissions, roles })
+
+      if (!userHasValidPermissions) {
+        return {
+          redirect: {
+            destination: '/dashboard',
+            permanent: false
+          }
         }
       }
     }
